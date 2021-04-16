@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -72,6 +73,24 @@ var _ = Describe("[rfe_id:OCP-38968][ppc] Performance Profile Creator", func() {
 			Expect(profile).To(BeEquivalentTo(expectedProfile), "regression test failed for '%s' case", expectedProfilePath)
 		}
 	})
+	It("[test_id:OCP-40941] Verify allocation of odd number of reserved cpus fail with when split across numa nodes", func() {
+		Expect(ppcPath).To(BeAnExistingFile())
+		mustGatherFullPath := path.Join(mustGatherPath, "must-gather.bare-metal")
+		Expect(mustGatherFullPath).To(BeADirectory())
+		cmdArgs := []string {
+		        fmt.Sprintf("--disable-ht=%t", false),
+			fmt.Sprintf("--mcp-name=%s", "worker-cnf"),
+			fmt.Sprintf("--must-gather-dir-path=%s", mustGatherFullPath),
+			fmt.Sprintf("--reserved-cpu-count=%d", 2),
+			fmt.Sprintf("--rt-kernel=%t", true),
+			fmt.Sprintf("--split-reserved-cpus-across-numa=%t", true),
+			fmt.Sprintf("--user-level-networking=%t", false),
+			fmt.Sprintf("--profile-name=%s", "Performance"),
+	       }
+	       _, err := testutils.ExecAndLogCommand(ppcPath, cmdArgs...)
+	       ppcErrorString := errorStringParser(err)
+	       Expect(ppcErrorString).To(ContainSubstring("failed to compute the reserved and isolated CPUs: can't allocate odd number of CPUs from a NUMA Node"))
+	})
 })
 
 func getMustGatherDirs(mustGatherPath string) map[string]string {
@@ -136,4 +155,18 @@ func getExpectedProfiles(expectedProfilesPath string, mustGatherDirs map[string]
 	}
 
 	return expectedProfiles
+}
+
+
+func errorStringParser(err error) string {
+	var errorString string
+	exitError := err.(*exec.ExitError)
+	stdError := string(exitError.Stderr)
+	for _, line := range strings.Split(stdError, "\n") {
+		if strings.Contains(line, "Error:") {
+			errorString = line
+			break
+		}
+	}
+	return errorString
 }
