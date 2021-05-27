@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"path"
 	"path/filepath"
-	"strings"
+	//"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
